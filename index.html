@@ -6,80 +6,85 @@
     <title>Aura Burger | Cardápio Digital</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        .custom-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
-    </style>
 </head>
-<body class="bg-[#FBF4E0] text-[#12304A] font-sans">
+<body class="bg-[#FBF4E0] text-[#12304A]">
 
-    <!-- Header -->
     <header class="bg-[#12304A] text-white p-6 text-center">
         <h1 class="text-3xl font-bold">Aura Burger</h1>
         <p class="text-[#F0A81C] italic mt-2">Sabor artesanal feito com boa energia</p>
     </header>
 
-    <!-- App Container -->
     <main class="max-w-2xl mx-auto p-4">
         <div id="products-list" class="grid gap-4 mt-6">
-            <!-- Produtos serão carregados aqui -->
-            <p class="text-center animate-pulse">Carregando lanches...</p>
+            <p class="text-center">Carregando cardápio...</p>
         </div>
     </main>
 
-    <!-- Footer -->
-    <footer class="text-center p-6 mt-10 border-t border-[#2C8CC4]">
-        <button onclick="openAdmin()" class="text-sm underline hover:text-[#2C8CC4]">🔒 Área Admin</button>
+    <footer class="text-center p-6 border-t border-[#2C8CC4] mt-10">
+        <button onclick="openAdmin()" class="text-sm underline text-[#0E4A66]">🔒 Área Admin</button>
     </footer>
 
+    <!-- MODAL ADMIN -->
+    <div id="admin-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-lg w-full max-w-md">
+            <h2 class="text-xl font-bold mb-4">Área Administrativa</h2>
+            <div id="admin-content">
+                <input type="email" id="admin-email" placeholder="E-mail" class="w-full p-2 border mb-2 rounded">
+                <input type="password" id="admin-pass" placeholder="Senha" class="w-full p-2 border mb-4 rounded">
+                <button onclick="loginAdmin()" class="w-full bg-[#5A8F3E] text-white py-2 rounded">Entrar</button>
+            </div>
+            <button onclick="closeAdmin()" class="mt-4 text-sm text-gray-500 w-full">Fechar</button>
+        </div>
+    </div>
+
     <script>
-        // CONFIGURAÇÃO SUPABASE
         const SUPABASE_URL = "https://auvltcwshpvknhhvmwxt.supabase.co";
         const SUPABASE_KEY = "sb_publishable_cisP6qn5JU3h6rRccnDdAA_SuC2Moy3";
+        const ADMIN_ID = "ae1cbd77-ed19-43e6-b4f3-cbbb008ad54a";
         const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // CARREGAR PRODUTOS
         async function loadProducts() {
-            const { data, error } = await supabase.from('products').select('*');
-            if (error) {
-                console.error("Erro ao buscar produtos:", error);
-                document.getElementById('products-list').innerHTML = "Erro ao carregar cardápio.";
+            const { data } = await supabase.from('products').select('*');
+            const container = document.getElementById('products-list');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<p class="text-center">Nenhum produto cadastrado no banco ainda.</p>';
                 return;
             }
-
-            const container = document.getElementById('products-list');
             container.innerHTML = data.map(p => `
                 <div class="bg-white p-4 rounded-lg shadow-sm border border-[#2C8CC4] flex justify-between items-center">
                     <div>
-                        <h3 class="font-bold text-lg">${p.name}</h3>
+                        <h3 class="font-bold">${p.name}</h3>
                         <p class="text-sm text-gray-600">${p.description}</p>
-                        <span class="text-[#F0A81C] font-bold mt-2 block">R$ ${p.price.toFixed(2)}</span>
+                        <span class="text-[#F0A81C] font-bold">R$ ${p.price ? p.price.toFixed(2) : '0.00'}</span>
                     </div>
-                    <button onclick="addToCart('${p.id}')" class="bg-[#0E4A66] text-white px-4 py-2 rounded-full text-sm">Adicionar</button>
                 </div>
             `).join('');
         }
 
-        function openAdmin() {
-            const pass = prompt("Digite a senha do painel:");
-            if (pass === "1234") {
-                alert("Acesso liberado! (Em breve: Painel Completo)");
-                // Aqui você abrirá o painel administrativo
+        function openAdmin() { document.getElementById('admin-modal').classList.remove('hidden'); }
+        function closeAdmin() { document.getElementById('admin-modal').classList.add('hidden'); }
+
+        async function loginAdmin() {
+            const email = document.getElementById('admin-email').value;
+            const password = document.getElementById('admin-pass').value;
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            
+            if (error) { alert("Erro: " + error.message); return; }
+            
+            if (data.user.id === ADMIN_ID) {
+                document.getElementById('admin-content').innerHTML = `
+                    <div class="text-center">
+                        <p class="text-green-600 font-bold">Bem-vindo, Administrador!</p>
+                        <p class="mt-2 text-sm">O sistema de faturamento em tempo real está ativo.</p>
+                        <button onclick="location.reload()" class="mt-4 bg-gray-200 px-4 py-2 rounded">Sair</button>
+                    </div>
+                `;
             } else {
-                alert("Senha incorreta.");
+                alert("Acesso restrito apenas ao dono da loja.");
             }
         }
 
-        // Iniciar
         loadProducts();
-
-        // Monitorar Pedidos em Tempo Real
-        supabase.channel('orders')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, payload => {
-                console.log('Novo pedido recebido!', payload.new);
-                alert('🍔 NOVO PEDIDO CHEGOU! Veja no seu painel.');
-            })
-            .subscribe();
-
     </script>
 </body>
 </html>
